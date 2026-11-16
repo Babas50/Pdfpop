@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' blob: data:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'">
+<title>PDF Pop, éditeur PDF</title>
+<meta name="description" content="Annoter, assembler et alléger des PDF. Vos fichiers restent sur votre appareil.">
+<meta name="theme-color" content="#5B3DF5">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app" class="app" data-mode="annoter">
+
+<header class="top">
+  <div class="brand">
+    <span class="logo"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/></svg></span>
+    <span class="brand-name">PDF Pop</span>
+  </div>
+  <div class="file-chip" id="fileName" hidden></div>
+  <nav class="modes" aria-label="Mode de travail">
+    <button class="mode" data-mode="annoter" aria-pressed="true">Annoter</button>
+    <button class="mode" data-mode="assembler" aria-pressed="false">Assembler</button>
+    <button class="mode" data-mode="alleger" aria-pressed="false">Alléger</button>
+  </nav>
+  <div class="spacer"></div>
+  <div class="privacy" title="Aucun fichier n'est envoyé sur Internet">
+    <svg class="ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>
+    <span>Fichiers traités sur votre appareil</span>
+  </div>
+  <button id="installBtn" class="btn ghost" hidden>Installer l'appli</button>
+  <button id="undoBtn" class="icon-btn" aria-label="Annuler" disabled><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14L4 9l5-5M4 9h10a6 6 0 010 12h-3"/></svg></button>
+  <button id="redoBtn" class="icon-btn" aria-label="Rétablir" disabled><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 14l5-5-5-5M20 9H10a6 6 0 000 12h3"/></svg></button>
+  <button id="exportBtn" class="btn primary exp" disabled><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16"/></svg><span class="exp-t"><b>Exporter</b><small>PDF avec vos annotations</small></span></button>
+</header>
+
+<main class="main">
+
+  <!-- Annoter -->
+  <section id="viewDoc" class="view">
+    <div id="docEmpty" class="empty">
+      <div class="drop" id="docDrop">
+        <div class="drop-icon"><svg class="ico big" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/></svg></div>
+        <h1>Ouvrez un PDF</h1>
+        <p>Glissez-le ici ou choisissez-le sur votre appareil. Il ne quitte jamais votre appareil.</p>
+        <button class="btn primary big" id="docPick">Choisir un PDF</button>
+      </div>
+    </div>
+
+    <div id="docLayout" class="layout" hidden>
+      <nav id="rail" class="rail" aria-label="Outils">
+        <button class="tool" data-tool="select" aria-pressed="true" style="--chip:#E8E4FF;--chip-ink:#4A2FD1"><span class="chip"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3l14 7-6 2-2 6z"/></svg></span>Sélection</button>
+        <button class="tool" data-tool="text" aria-pressed="false" style="--chip:#DCEBFF;--chip-ink:#1450B8"><span class="chip"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6V4h14v2M12 4v16M9 20h6"/></svg></span>Texte</button>
+        <button class="tool" data-tool="highlight" aria-pressed="false" style="--chip:#FFF0B3;--chip-ink:#7A5800"><span class="chip"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h6M14 4l6 6-8 8H8v-4z"/></svg></span>Surligner</button>
+        <button class="tool" data-tool="draw" aria-pressed="false" style="--chip:#FFDDE6;--chip-ink:#B0153F"><span class="chip"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l4-1 11-11-3-3L5 16z"/></svg></span>Dessiner</button>
+        <button class="tool" data-tool="sign" aria-pressed="false" style="--chip:#D6F5E3;--chip-ink:#0B6B3A"><span class="chip"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 16c3-7 5-7 6-3s3 3 5-3 4-2 7 1M3 21h18"/></svg></span>Signer</button>
+      </nav>
+
+      <aside id="thumbs" class="thumbs" aria-label="Pages du document"></aside>
+
+      <section class="stage" id="stage">
+        <div class="page-scroll" id="pageScroll">
+          <div class="page-wrap" id="pageWrap">
+            <canvas id="pageCanvas"></canvas>
+            <div id="overlay" class="overlay" data-tool="select"></div>
+          </div>
+        </div>
+        <div class="pager" role="group" aria-label="Zoom et pages">
+          <button class="round" id="zoomOut" aria-label="Zoom arrière">-</button>
+          <span class="zoom-label" id="zoomLabel">100 %</span>
+          <button class="round" id="zoomIn" aria-label="Zoom avant">+</button>
+          <span class="sep"></span>
+          <button class="round" id="prevPage" aria-label="Page précédente"><svg class="ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+          <span class="page-label" id="pageLabel">Page 1 / 1</span>
+          <button class="round" id="nextPage" aria-label="Page suivante"><svg class="ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
+        </div>
+      </section>
+
+      <aside id="panel" class="panel">
+        <div class="panel-head"><span class="dot" id="toolDot"></span><h2 id="toolTitle">Sélection</h2>
+          <button id="panelToggle" class="icon-btn mob-only" aria-label="Afficher ou masquer les réglages" aria-expanded="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+        </div>
+        <div class="panel-body">
+          <p class="hint" id="toolHint"></p>
+          <div id="ctlBox" class="ctlbox"></div>
+          <button class="btn danger" id="delBtn" hidden>Supprimer l'élément</button>
+          <div id="listBlock">
+            <hr>
+            <h3>Annotations de la page</h3>
+            <div id="annotList" class="alist"></div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- Assembler -->
+  <section id="viewAsm" class="view" hidden>
+    <div class="tworkspace">
+      <nav class="tasks" aria-label="Que voulez-vous faire ?">
+        <button class="task" data-task="fusion" aria-pressed="true"><span class="tico"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4v6a4 4 0 004 4h4a4 4 0 004-4V4M12 14v6M9 17l3 3 3-3"/></svg></span><span class="tt"><b>Fusionner</b><small>Réunir plusieurs PDF en un seul</small></span></button>
+        <button class="task" data-task="diviser" aria-pressed="false"><span class="tico"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v6M12 10L6 17v3M12 10l6 7v3M9 7l3-3 3 3"/></svg></span><span class="tt"><b>Diviser</b><small>Découper un PDF en plusieurs fichiers</small></span></button>
+        <button class="task" data-task="extraire" aria-pressed="false"><span class="tico"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="10" height="13" rx="1"/><path d="M10 21h10V9M14 14l5 5M19 14v5h-5"/></svg></span><span class="tt"><b>Extraire</b><small>Garder seulement certaines pages</small></span></button>
+      </nav>
+
+      <!-- Fusionner -->
+      <section id="tFusion" class="tpane">
+        <div id="fEmpty" class="empty"><div class="drop">
+          <div class="drop-icon"><svg class="ico big" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4v6a4 4 0 004 4h4a4 4 0 004-4V4M12 14v6M9 17l3 3 3-3"/></svg></div>
+          <h1>Fusionner des PDF</h1>
+          <p>Ajoutez deux PDF ou plus. Vous les mettrez dans l'ordre, puis vous créerez un seul fichier.</p>
+          <button class="btn primary big" id="fPick">Choisir des PDF</button>
+        </div></div>
+        <div id="fCols" class="tcols" hidden>
+          <aside class="tleft">
+            <h2>1. Vos fichiers, dans l'ordre</h2>
+            <div id="fFiles" class="flist-files"></div>
+            <button class="dropbtn" id="fAdd"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Ajouter des PDF</span></button>
+            <p class="hint">Vous pouvez aussi déposer des fichiers sur la page.</p>
+            <div class="field"><label for="fName">Nom du PDF créé</label><input id="fName" type="text" value="Document-fusionne.pdf" autocomplete="off"></div>
+          </aside>
+          <section class="tright">
+            <h2>2. Vérifiez les pages <span class="opt-tag">facultatif</span></h2>
+            <div class="bar">
+              <span id="fSelInfo" class="sel-info"></span>
+              <button class="btn soft" id="fLeft" aria-label="Avancer la sélection">&#9664; Avancer</button>
+              <button class="btn soft" id="fRight" aria-label="Reculer la sélection">Reculer &#9654;</button>
+              <button class="btn soft" id="fRot">Pivoter</button>
+              <button class="btn soft danger-soft" id="fDel">Supprimer</button>
+            </div>
+            <div id="fGrid" class="grid"></div>
+            <p class="hint">Touchez une page pour la sélectionner. Faites-la glisser pour la déplacer, ou utilisez Avancer et Reculer. La couleur du cadre indique le fichier d'origine.</p>
+          </section>
+        </div>
+        <footer id="fBar" class="tbar" hidden><p class="tcap" id="fCap"></p><button class="btn primary big" id="fGo"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16"/></svg>Créer le PDF fusionné</button></footer>
+      </section>
+
+      <!-- Diviser -->
+      <section id="tDiviser" class="tpane" hidden>
+        <div id="dEmpty" class="empty"><div class="drop">
+          <div class="drop-icon"><svg class="ico big" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v6M12 10L6 17v3M12 10l6 7v3M9 7l3-3 3 3"/></svg></div>
+          <h1>Diviser un PDF</h1>
+          <p>Choisissez un PDF, puis indiquez comment le découper. Vous obtiendrez une archive .zip.</p>
+          <button class="btn primary big" id="dPick">Choisir un PDF</button>
+        </div></div>
+        <div id="dCols" class="tcols" hidden>
+          <aside class="tleft">
+            <h2>1. Votre fichier</h2>
+            <div id="dFile"></div>
+            <button class="btn ghost" id="dChange">Changer de fichier</button>
+            <h2 class="gap">2. Comment découper ?</h2>
+            <label class="opt"><input type="radio" name="dmode" value="each"><span class="dotr"></span><span class="otxt"><b>Une page par fichier</b><small>Chaque page devient un PDF</small></span></label>
+            <label class="opt"><input type="radio" name="dmode" value="every"><span class="dotr"></span><span class="otxt"><b>Tous les N pages</b><small>Par exemple tous les 4 pages</small></span></label>
+            <div id="dEveryRow" class="steprow" hidden>
+              <span>Tous les</span>
+              <button class="sbtn" id="dMinus" aria-label="Diminuer"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+              <input id="dEvery" type="text" inputmode="numeric" value="4" aria-label="Nombre de pages par fichier">
+              <button class="sbtn" id="dPlus" aria-label="Augmenter"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+              <span>pages</span>
+            </div>
+            <label class="opt"><input type="radio" name="dmode" value="ranges"><span class="dotr"></span><span class="otxt"><b>Par plages</b><small>Par exemple 1-3, 4-8</small></span></label>
+            <div id="dRangesRow" class="field" hidden><label for="dRanges">Plages de pages</label><input id="dRanges" type="text" placeholder="1-3, 4-8" autocomplete="off"></div>
+          </aside>
+          <section class="tright">
+            <h2>Aperçu du résultat</h2>
+            <div id="dPreview" class="gchips"></div>
+          </section>
+        </div>
+        <footer id="dBar" class="tbar" hidden><p class="tcap" id="dCap"></p><button class="btn primary big" id="dGo"></button></footer>
+      </section>
+
+      <!-- Extraire -->
+      <section id="tExtraire" class="tpane" hidden>
+        <div id="eEmpty" class="empty"><div class="drop">
+          <div class="drop-icon"><svg class="ico big" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="10" height="13" rx="1"/><path d="M10 21h10V9M14 14l5 5M19 14v5h-5"/></svg></div>
+          <h1>Extraire des pages</h1>
+          <p>Choisissez un PDF, touchez les pages à garder, puis créez un nouveau PDF.</p>
+          <button class="btn primary big" id="ePick">Choisir un PDF</button>
+        </div></div>
+        <div id="eCols" class="tcols ecols" hidden>
+          <aside class="tleft">
+            <h2>1. Votre fichier</h2>
+            <div id="eFile"></div>
+            <button class="btn ghost" id="eChange">Changer de fichier</button>
+          </aside>
+          <section class="tright">
+            <h2>2. Touchez les pages à garder</h2>
+            <div class="bar"><span id="eSelInfo" class="sel-info"></span><button class="btn soft" id="eAll">Tout sélectionner</button></div>
+            <div id="eGrid" class="grid"></div>
+          </section>
+        </div>
+        <footer id="eBar" class="tbar" hidden><p class="tcap" id="eCap"></p><button class="btn primary big" id="eGo"></button></footer>
+      </section>
+    </div>
+  </section>
+
+  <!-- Alléger -->
+  <section id="viewLite" class="view" hidden>
+    <div class="tworkspace">
+      <section class="tpane">
+        <div id="lEmpty" class="empty"><div class="drop">
+          <div class="drop-icon"><svg class="ico big" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v10m0 0l-4-4m4 4l4-4M5 17h14v4H5z"/></svg></div>
+          <h1>Alléger des PDF pour un mail</h1>
+          <p>Ajoutez un ou plusieurs PDF. Les images lourdes sont réduites, le texte reste net. Vos originaux ne sont jamais modifiés.</p>
+          <button class="btn primary big" id="lPick">Choisir des PDF</button>
+        </div></div>
+        <div id="lCols" class="tcols" hidden>
+          <aside class="tleft wide">
+            <h2>1. Choisissez le niveau</h2>
+            <div id="lLevels" class="levels"></div>
+            <p class="hint">Le niveau s'applique à tous les fichiers de la liste. Une signature électronique du PDF d'origine ne sera plus valide après allègement.</p>
+          </aside>
+          <section class="tright">
+            <h2>2. Vos fichiers <span class="opt-tag">un ou plusieurs</span></h2>
+            <div id="lList" class="llist"></div>
+            <button class="dropbtn" id="lAdd"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Ajouter des PDF</span></button>
+            <div class="totalbox" id="lTotal"></div>
+          </section>
+        </div>
+        <footer id="lBar" class="tbar" hidden><p class="tcap" id="lCap"></p><button class="btn primary big" id="lGo"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16"/></svg><span id="lGoLabel">Alléger</span></button></footer>
+      </section>
+    </div>
+  </section>
+</main>
+
+<div id="busy" class="busy" hidden><div class="spin"></div><span id="busyText">Traitement en cours...</span></div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<input type="file" id="docInput" accept="application/pdf,.pdf" hidden>
+<input type="file" id="asmInput" accept="application/pdf,.pdf" multiple hidden>
+<input type="file" id="lInput" accept="application/pdf,.pdf" multiple hidden>
+
+<dialog id="sigDialog" aria-labelledby="sigTitle">
+  <h2 id="sigTitle">Tracez votre signature</h2>
+  <p class="hint">Dessinez avec le doigt, le stylet ou la souris. Elle reste enregistrée sur cet appareil uniquement.</p>
+  <canvas id="sigCanvas" width="720" height="240" aria-label="Zone de signature"></canvas>
+  <div class="row end">
+    <button class="btn ghost" id="sigClear">Effacer</button>
+    <button class="btn outline" id="sigCancel">Annuler</button>
+    <button class="btn primary" id="sigOk">Valider</button>
+  </div>
+</dialog>
+</div>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
