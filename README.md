@@ -11,9 +11,10 @@ Le remplissage de formulaires n'est plus inclus (utiliser Edge).
 
 ## Mise en ligne sur GitHub Pages
 1. Créer un dépôt `pdfpop` (public).
-2. Décompresser le zip, puis glisser TOUT le contenu (dossiers inclus, et le fichier caché `.nojekyll`) dans « Add file > Upload files ». Le total est inférieur à 100 fichiers : un seul glisser-déposer suffit.
-3. Commit, puis Settings > Pages > Branch `main` / dossier `/ (root)`.
-4. L'adresse est `https://VOTRE-NOM.github.io/pdfpop/`.
+2. Décompresser le zip, puis glisser TOUT le contenu (dossiers inclus, et le dossier caché `.github`) dans « Add file > Upload files ». Le total est inférieur à 100 fichiers : un seul glisser-déposer suffit.
+3. Commit, puis Settings > Pages > Source : **GitHub Actions**.
+4. Le workflow `.github/workflows/pages.yml` publie le site à chaque commit sur `main` (suivi dans l'onglet « Actions »). Il sert les fichiers tels quels, sans passer par Jekyll.
+5. L'adresse est `https://VOTRE-NOM.github.io/pdfpop/`.
 
 ## Mise à jour
 Après toute modification, augmenter `VERSION` dans `sw.js` (ex. `pdfpop-v3`), sinon les anciens fichiers restent en cache.
